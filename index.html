@@ -22,12 +22,33 @@
     }
     #controls {
       margin-bottom: 20px;
-	  max-width: 100%
+	  width: 100%;
+	  max-width: 600px;
     }
     textarea, input {
       margin: 5px;
       padding: 5px;
     }
+	#bulkInput {
+	  width: 100%;
+	  max-width: 600px;
+	  box-sizing: border-box;
+	}
+
+	@media (max-width: 600px) {
+	  #bulkInput {
+		max-width: 300px;
+	  }
+	  .btn {
+		max-width: 65px;
+	  }
+	}
+	
+	.btn {
+		width: 100px;
+		margin-top:5px;
+	}
+	
     .grid-wrapper {
       background-color: #D2B48C;
       padding: 10px;
@@ -144,13 +165,13 @@
   <h1>Mario Maker Bingo</h1>
   <div id="controls">
     <div style="display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap;">
-      <div style="flex-grow: 1; display: flex; flex-direction: column;">
-        <textarea id="bulkInput" rows="4" cols="30" placeholder="Paste challenges here, separated by semicolons or newlines..."></textarea>
+	  <div style="flex-grow: 1; display: flex; flex-direction: column;">
+        <textarea id="bulkInput" rows="4" placeholder="Paste challenges here, separated by semicolons or newlines..."></textarea>
       </div>
       <div style="display: flex; flex-direction: column; gap: 5px;">
-        <button onclick="exportGrid()">Export</button>
+        <button class="btn" onclick="exportGrid()">Export</button>
         <input type="file" id="importFileInput" style="display: none;" accept="application/json" onchange="importFromFile(event)">
-        <button onclick="document.getElementById('importFileInput').click()">Import</button>
+        <button class="btn" onclick="document.getElementById('importFileInput').click()">Import</button>
       </div>
     </div>
     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px;">
