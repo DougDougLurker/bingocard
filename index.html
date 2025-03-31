@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mario Maker Bingo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --x-opacity: 0.5;
+      --bg-opacity: 0.5;
+    }
+
+    body {
+      background-color: #1a1a1a;
+      font-family: 'Anton', sans-serif;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 20px;
+    }
+    #controls {
+      margin-bottom: 20px;
+    }
+    textarea, input {
+      margin: 5px;
+      padding: 5px;
+    }
+    .grid-wrapper {
+      background-color: #D2B48C;
+      padding: 10px;
+      position: relative;
+      display: inline-block;
+    }
+    .grid-background {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: url('background.jpg');
+      background-size: cover;
+      background-position: center;
+      opacity: var(--bg-opacity);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(var(--grid-size), 1fr);
+      gap: 5px;
+      position: relative;
+      z-index: 1;
+    }
+    .tile {
+      position: relative;
+      background-color: transparent;
+      border: 4px solid black;
+      width: 120px;
+      height: 120px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 5px;
+      font-size: 1.5em;
+      line-height: 1.1;
+      text-shadow: 2px 2px 0 #000, -1px -1px 0 #000;
+      cursor: pointer;
+      user-select: none;
+      overflow: hidden;
+    }
+	.landmine {
+		border: 4px solid #ff6b6b;
+	}
+    .tile span, .tile input {
+      display: block;
+      font-size: clamp(12px, 7vw, 24px);
+      max-width: 100%;
+      word-break: break-word;
+      background: none;
+      border: none;
+      text-align: center;
+      color: white;
+      font-family: 'Anton', sans-serif;
+      text-shadow: 2px 2px 0 #000, -1px -1px 0 #000;
+    }
+    .tile input:focus {
+      outline: none;
+      background-color: rgba(255, 255, 255, 0.1);
+    }
+    .tile.checked::after {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      top: 0;
+      left: 0;
+      background-image: url('red-x.png');
+      background-size: cover;
+      background-repeat: no-repeat;
+      background-position: center;
+      pointer-events: none;
+      opacity: var(--x-opacity);
+    }
+    .tile.checked.no-image::after {
+      content: 'X';
+      font-size: 64px;
+      color: red;
+      text-shadow: 2px 2px black;
+      opacity: var(--x-opacity);
+    }
+    .hidden {
+      display: none;
+    }
+    .landmine-label {
+      font-size: 48px;
+      color: #ff6b6b;
+      margin-bottom: 0;
+	  margin-top: 0;
+    }
+    .landmine-subtext {
+      font-size: 18px;
+      color: #ff6b6b;
+      margin-top: 0;
+    }
+    .landmine-container {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-top: 10px;
+      flex-wrap: wrap;
+    }
+    .landmine-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Mario Maker Bingo</h1>
+  <div id="controls">
+    <div style="display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap;">
+      <div style="flex-grow: 1; display: flex; flex-direction: column;">
+        <textarea id="bulkInput" rows="4" cols="50" placeholder="Paste challenges here, separated by semicolons or newlines..."></textarea>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 5px;">
+        <button onclick="exportGrid()">Export</button>
+        <input type="file" id="importFileInput" style="display: none;" accept="application/json" onchange="importFromFile(event)">
+        <button onclick="document.getElementById('importFileInput').click()">Import</button>
+      </div>
+    </div>
+    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 10px;">
+      <button onclick="populateGrid()">Populate</button>
+      <button onclick="shuffleGrid()">Shuffle</button>
+      <input type="text" id="search" placeholder="Search..." oninput="filterGrid()">
+    </div>
+  </div>
+
+  <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 1020px; margin-bottom: 10px;">
+    <div></div>
+    <div>
+      <label for="gridSizeInput" style="margin-right: 5px;">Grid Size:</label>
+      <input type="number" id="gridSizeInput" value="8" min="1" max="20" style="width: 60px;">
+      <button onclick="resizeGrid()">Resize</button>
+    </div>
+  </div>
+
+  <div style="overflow-x: auto; width: 100%; max-width: 100vw;">
+    <div style="zoom: var(--zoom-scale, 1); width: max-content; margin: 0 auto;">
+      <div class="grid-wrapper">
+        <div class="grid-background"></div>
+        <div class="grid" id="bingoGrid"></div>
+      </div>
+    </div>
+  </div>
+
+	<!-- Add Landmines UI — hidden for now, might add later. Limited to 6 landmines until I can be arsed. -->
+  <!-- <div style="display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; margin-top: 30px;"> -->
+    <!-- <div style="flex-grow: 1; display: flex; flex-direction: column;"> -->
+      <!-- <textarea id="landmineInput" rows="2" cols="50" placeholder="Add landmines here, separated by semicolons or newlines..."></textarea> -->
+    <!-- </div> -->
+    <!-- <button onclick="addLandmines()">Add</button> -->
+  <!-- </div> -->
+
+  <div class="landmine-container">
+    <div>
+      <p class="landmine-label">LANDMINES</p>
+      <p class="landmine-subtext">(5 gifted subs if they happen)</p>
+    </div>
+    <div class="landmine-row" id="landmineRow">
+      <div class="tile landmine"><span>Right click to edit Landmine</span></div>
+      <div class="tile landmine"><span>Right click to edit Landmine</span></div>
+      <div class="tile landmine"><span>Right click to edit Landmine</span></div>
+      <div class="tile landmine"><span>Right click to edit Landmine</span></div>
+      <div class="tile landmine"><span>Right click to edit Landmine</span></div>
+      <div class="tile landmine"><span>Right click to edit Landmine</span></div>
+    </div>
+  </div>
+
+  <script>
+    let gridSize = 8;
+    let challenges = Array(gridSize * gridSize).fill('');
+    let redXImage = new Image();
+    redXImage.src = 'red-x.png';
+
+    redXImage.onload = () => {
+      loadFromStorage();
+	  adjustZoom();
+      createGrid();
+    };
+    redXImage.onerror = () => {
+      redXImage = null;
+      createGrid();
+    };
+
+    function createGrid() {
+      document.documentElement.style.setProperty('--grid-size', gridSize);
+      saveToStorage();
+      document.documentElement.style.setProperty('--grid-size', gridSize);
+      const grid = document.getElementById('bingoGrid');
+      grid.innerHTML = '';
+      challenges.forEach((text, i) => {
+        const div = document.createElement('div');
+        div.className = 'tile';
+
+        const span = document.createElement('span');
+        span.textContent = text;
+        
+		div.appendChild(span);
+		div.onclick = (e) => {
+		  if (e.target.tagName !== 'INPUT') {
+			div.classList.toggle('checked');
+			if (!redXImage) div.classList.toggle('no-image');
+			saveToStorage();
+		  }
+		};
+
+		// Right-click to edit
+		div.oncontextmenu = (e) => {
+		  e.preventDefault();
+		  editTile(div, span, i);
+		};
+		if (!redXImage) div.classList.add('no-image');
+		grid.appendChild(div);
+	  });
+    }
+	
+	function adjustZoom() {
+	  const screenWidth = window.innerWidth;
+	  const requiredWidth = gridSize * 125; // 120px tile + 5px gap
+	  const scale = screenWidth < requiredWidth ? screenWidth / requiredWidth : 1;
+	  document.documentElement.style.setProperty('--zoom-scale', scale);
+	}
+
+    function editTile(tile, span, index) {
+      const currentText = span.textContent;
+      const input = document.createElement('input');
+      input.type = 'text';
+      input.value = currentText;
+      input.onblur = () => {
+        const newText = input.value.trim();
+        challenges[index] = newText;
+        updateTextarea();
+        createGrid();
+      };
+      input.onkeydown = (e) => {
+        if (e.key === 'Enter') {
+          input.blur();
+        }
+      };
+      tile.replaceChild(input, span);
+      input.focus();
+    }
+	
+	function makeLandminesEditable() {
+	  const landmineTiles = document.querySelectorAll('#landmineRow .tile');
+	  landmineTiles.forEach((tile, i) => {
+		const span = tile.querySelector('span');
+		tile.oncontextmenu = (e) => {
+		  e.preventDefault();
+		  const currentText = span.textContent;
+		  const input = document.createElement('input');
+		  input.type = 'text';
+		  input.value = currentText;
+		  input.onblur = () => {
+			span.textContent = input.value.trim();
+			tile.replaceChild(span, input);
+			saveToStorage();
+		  };
+		  input.onkeydown = (e) => {
+			if (e.key === 'Enter') input.blur();
+		  };
+		  tile.replaceChild(input, span);
+		  input.focus();
+		};
+	  });
+	}
+
+    function updateTextarea() {
+      document.getElementById('bulkInput').value = challenges.join(';');
+      saveToStorage();
+    }
+
+    function populateGrid() {
+		const input = document.getElementById('bulkInput').value;
+		const entries = input.split(/[;\n]+/).map(e => e.trim()).filter(e => e);
+		challenges = Array(gridSize * gridSize).fill('');
+		for (let i = 0; i < gridSize * gridSize; i++) {
+			challenges[i] = entries[i] || '';
+		}
+			saveToStorage();
+			createGrid();
+		if (challenges.some(c => c.toLowerCase().includes("doug is good at 2d platformers"))) {
+			alert('Error: Attempting to input invalid phrase "Doug is good at 2D platformers". Try "Doug is bad at 2D platformers" instead.');
+		}
+	}
+
+
+    function shuffleGrid() {
+      challenges = challenges.slice(0, gridSize * gridSize);
+      for (let i = challenges.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [challenges[i], challenges[j]] = [challenges[j], challenges[i]];
+      }
+      // Clear checkmarks before saving and re-rendering
+      const tiles = document.querySelectorAll('.tile');
+      tiles.forEach(tile => tile.classList.remove('checked', 'no-image'));
+      updateTextarea();
+      saveToStorage();
+      createGrid();
+    }
+
+    function filterGrid() {
+      const query = document.getElementById('search').value.toLowerCase();
+      document.querySelectorAll('.tile').forEach(tile => {
+        const match = tile.textContent.toLowerCase().includes(query);
+        tile.classList.toggle('hidden', !match && query);
+      });
+    }
+	
+	function filterGrid() {
+	  const query = document.getElementById('search').value.toLowerCase();
+	  document.querySelectorAll('.tile').forEach(tile => {
+		if (!tile.classList.contains('landmine')){; // Skip landmine tiles
+			const match = tile.textContent.toLowerCase().includes(query);
+			tile.classList.toggle('hidden', !match && query);
+		}
+	  });
+	}
+
+
+    function resizeGrid() {
+      const newSize = parseInt(document.getElementById('gridSizeInput').value);
+      if (!isNaN(newSize) && newSize > 0 && newSize <= 20) {
+        gridSize = newSize;
+        challenges = Array(gridSize * gridSize).fill('');
+        populateGrid();
+        saveToStorage();
+      }
+    };
+	
+	function saveToStorage() {
+		const checked = Array.from(document.querySelectorAll('.tile')).map(tile => tile.classList.contains('checked'));
+		const landmines = Array.from(document.querySelectorAll('#landmineRow .tile span')).map(span => span.textContent.trim());
+		localStorage.setItem('bingoGrid', JSON.stringify({ gridSize, challenges, checked, landmines }));
+	}
+	
+
+
+	function loadFromStorage() {
+	  const data = JSON.parse(localStorage.getItem('bingoGrid'));
+	  if (!data) return;
+	  gridSize = data.gridSize || 8;
+	  document.getElementById('gridSizeInput').value = gridSize;
+	  challenges = data.challenges || Array(gridSize * gridSize).fill('');
+	  const landmineSpans = document.querySelectorAll('#landmineRow .tile span');
+	  if (data.landmines && landmineSpans.length) {
+		data.landmines.forEach((text, i) => {
+		  if (landmineSpans[i]) landmineSpans[i].textContent = text;
+		});
+	  }
+	  setTimeout(() => {
+		const tiles = document.querySelectorAll('.tile');
+		data.checked?.forEach((val, i) => {
+		  if (val && tiles[i]) tiles[i].classList.add('checked');
+		});
+	  }, 100);
+	}
+
+	
+	function exportGrid() {
+	  const checked = Array.from(document.querySelectorAll('.tile')).map(tile => tile.classList.contains('checked'));
+	  const landmines = Array.from(document.querySelectorAll('#landmineRow .tile span')).map(span => span.textContent.trim());
+	  const data = { gridSize, challenges, checked, landmines };
+	  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+	  const url = URL.createObjectURL(blob);
+	  const a = document.createElement('a');
+	  a.href = url;
+	  a.download = 'mario-maker-bingo.json';
+	  a.click();
+	  URL.revokeObjectURL(url);
+	}
+
+
+function importFromFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = doImport;
+  reader.readAsText(file);
+}
+
+document.addEventListener('dragover', (e) => {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+});
+
+document.addEventListener('drop', (e) => {
+  e.preventDefault();
+  const file = e.dataTransfer.files[0];
+  if (!file || file.type !== 'application/json') return;
+  if (confirm('Import this bingo card from file?')) {
+  const reader = new FileReader();
+  reader.onload = doImport;
+  reader.readAsText(file);
+  }
+});
+
+function doImport(e) {
+  try {
+    const data = JSON.parse(e.target.result);
+    if (!data || !data.challenges || !data.gridSize) throw new Error("Invalid format");
+    gridSize = data.gridSize;
+    document.getElementById('gridSizeInput').value = gridSize;
+    challenges = data.challenges;
+    localStorage.setItem('bingoGrid', JSON.stringify(data));
+    createGrid();
+    const landmineSpans = document.querySelectorAll('#landmineRow .tile span');
+    if (data.landmines && landmineSpans.length) {
+      data.landmines.forEach((text, i) => {
+        if (landmineSpans[i]) landmineSpans[i].textContent = text;
+      });
+    }
+    setTimeout(() => {
+      const tiles = document.querySelectorAll('.tile');
+      data.checked?.forEach((val, i) => {
+        if (val && tiles[i]) tiles[i].classList.add('checked');
+      });
+      saveToStorage();
+    }, 100);
+  } catch (err) {
+    alert('Failed to import: invalid JSON file.');
+  }
+}
+
+window.addEventListener('resize', adjustZoom);
+window.addEventListener('load', () => makeLandminesEditable());
+
+</script>
+</body>
+</html>
